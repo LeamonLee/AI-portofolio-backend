@@ -78,7 +78,7 @@ def image_feed():
   # return send_file(image_binary, mimetype='image/jpg')
   
   # Method2
-  # return send_file(imagePath, mimetype='image/jpg')
+  return send_file(imagePath, mimetype='image/jpg')
 
   # Method3
   # img = cv2.imread(imagePath)

@@ -40,6 +40,8 @@ def create_app(config_class=Config):
     CORS(app, supports_credentials=True)
 
     from API.main.routes import main
+    from API.objectdetection.routes import objdetect
     app.register_blueprint(main)
+    app.register_blueprint(objdetect)
 
     return app
