@@ -1,6 +1,6 @@
 from flask import request, Blueprint, jsonify, Response, send_file
 from API import app, logger
-import io, time
+import io, time, base64
 import os, traceback
 
 # =============================
@@ -207,6 +207,55 @@ def image_detect3():
         # return Response(b'--frame\r\n' b'Content-Type: image/jpg\r\n\r\n' + frame.tobytes() + b'\r\n\r\n', mimetype='multipart/x-mixed-replace; boundary=frame')
         
         # return send_file(detectedImagePath, mimetype='image/jpg')
+
+    else:
+        return jsonify({"response": "FileNotFoundError"}), 400
+
+# API that returns JSON with classes found in images
+@objdetect.route('/image_detect4', methods=['POST'])
+def image_detect4():
+    image = request.files["images"]
+    imageFileName = image.filename
+    saveImagePath = os.path.join(outputPath, imageFileName)
+    image.save(saveImagePath)
+    print("saveImagePath: ", saveImagePath)
+    if imageFileName != "":
+        original_image = cv2.imread(saveImagePath)
+        original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
+
+        image_data = cv2.resize(original_image, (INPUT_IMAGE_SIZE, INPUT_IMAGE_SIZE))
+        image_data = image_data / 255.
+        image_data = image_data[np.newaxis, ...].astype(np.float32)
+        batch_data = tf.constant(image_data)
+        pred_bbox = infer(batch_data)
+
+        for key, value in pred_bbox.items():
+            boxes = value[:, :, 0:4]
+            pred_conf = value[:, :, 4:]
+
+        boxes, scores, classes, valid_detections = tf.image.combined_non_max_suppression(
+            boxes=tf.reshape(boxes, (tf.shape(boxes)[0], -1, 1, 4)),
+            scores=tf.reshape(
+                pred_conf, (tf.shape(pred_conf)[0], -1, tf.shape(pred_conf)[-1])),
+            max_output_size_per_class=50,
+            max_total_size=50,
+            iou_threshold=IOU,
+            score_threshold=SCORE
+        )
+
+        pred_bbox = [boxes.numpy(), scores.numpy(), classes.numpy(), valid_detections.numpy()]
+        detectedImage = utils.draw_bbox(original_image, pred_bbox)
+        detectedImage = cv2.cvtColor(detectedImage, cv2.COLOR_BGR2RGB)
+        detectedImageFileName = imageFileName.split('.')[0] + '_detected' + '.' + imageFileName.split('.')[1]
+        detectedImagePath = os.path.join(outputPath, detectedImageFileName)
+        print("detectedImagePath: ", detectedImagePath)
+        cv2.imwrite(detectedImagePath, detectedImage)
+        
+        with open(detectedImagePath, "rb") as image_file:
+          encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+        img_url = f'data:image/jpg;base64,{encoded_string}'
+        return img_url
+
 
     else:
         return jsonify({"response": "FileNotFoundError"}), 400
