@@ -1,7 +1,7 @@
 from flask import request, Blueprint, jsonify, Response, send_file
 from API import app, logger
-import io, time, base64
-import os, traceback
+import io, time
+import os, traceback, base64
 
 # =============================
 import tensorflow as tf
@@ -211,9 +211,11 @@ def image_detect3():
     else:
         return jsonify({"response": "FileNotFoundError"}), 400
 
+
 # API that returns JSON with classes found in images
 @objdetect.route('/image_detect4', methods=['POST'])
 def image_detect4():
+    print("image_detect4 received request")
     image = request.files["images"]
     imageFileName = image.filename
     saveImagePath = os.path.join(outputPath, imageFileName)
@@ -251,14 +253,18 @@ def image_detect4():
         print("detectedImagePath: ", detectedImagePath)
         cv2.imwrite(detectedImagePath, detectedImage)
         
-        with open(detectedImagePath, "rb") as image_file:
-          encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
-        img_url = f'data:image/jpg;base64,{encoded_string}'
+        try:
+          with open(detectedImagePath, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+          print("encoded_string: ", encoded_string)
+          img_url = f'data:image/jpg;base64,{encoded_string}'
+        except Exception as e:
+          print(e)
         return img_url
-
 
     else:
         return jsonify({"response": "FileNotFoundError"}), 400
+
 
 @objdetect.route('/video_detect', methods=['POST'])
 def video_detect():
