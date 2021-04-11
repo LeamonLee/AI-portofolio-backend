@@ -39,11 +39,10 @@ def error_400(error):
 weightsPath = os.path.join(app.root_path, "checkpoints\yolov4-custom-lpr-416")
 print("weightsPath: ", weightsPath)
 INPUT_IMAGE_SIZE = 416
-outputPath = os.path.join(app.root_path, "upload")
-print("outputPath:", outputPath)
 IOU = 0.45
 SCORE = 0.25
-VIDEO_OUTPUT_FORMAT = "XVID"
+# VIDEO_OUTPUT_FORMAT = "XVID"
+VIDEO_OUTPUT_FORMAT = 'MP4V'
 
 # config = ConfigProto()
 # config.gpu_options.allow_growth = True
@@ -58,7 +57,7 @@ infer = saved_model_loaded.signatures['serving_default']
 def image_detect():
     image = request.files["images"]
     imageFileName = image.filename
-    saveImagePath = os.path.join(outputPath, imageFileName)
+    saveImagePath = os.path.join(app.config["IMAGE_UPLOADS"], imageFileName)
     image.save(saveImagePath)
     print("saveImagePath: ", saveImagePath)
     if imageFileName != "":
@@ -91,7 +90,7 @@ def image_detect():
         detectedImage = cv2.cvtColor(np.array(detectedImage), cv2.COLOR_BGR2RGB)    # type(detectedImage3): <class 'numpy.ndarray'>
         
         detectedImageFileName = imageFileName.split('.')[0] + '_detected' + '.' + imageFileName.split('.')[1]
-        detectedImagePath = os.path.join(outputPath, detectedImageFileName)
+        detectedImagePath = os.path.join(app.config["IMAGE_UPLOADS"], detectedImageFileName)
         print("detectedImagePath: ", detectedImagePath)
         cv2.imwrite(detectedImagePath, detectedImage)
         
@@ -111,7 +110,7 @@ def image_detect():
 def image_detect2():
     image = request.files["images"]
     imageFileName = image.filename
-    saveImagePath = os.path.join(outputPath, imageFileName)
+    saveImagePath = os.path.join(app.config["IMAGE_UPLOADS"], imageFileName)
     image.save(saveImagePath)
     print("saveImagePath: ", saveImagePath)
     if imageFileName != "":
@@ -142,7 +141,7 @@ def image_detect2():
         detectedImage = utils.draw_bbox(original_image, pred_bbox)
         detectedImage = cv2.cvtColor(detectedImage, cv2.COLOR_BGR2RGB)
         detectedImageFileName = imageFileName.split('.')[0] + '_detected' + '.' + imageFileName.split('.')[1]
-        detectedImagePath = os.path.join(outputPath, detectedImageFileName)
+        detectedImagePath = os.path.join(app.config["IMAGE_UPLOADS"], detectedImageFileName)
         print("detectedImagePath: ", detectedImagePath)
         cv2.imwrite(detectedImagePath, detectedImage)
         
@@ -161,7 +160,7 @@ def image_detect2():
 def image_detect3():
     image = request.files["images"]
     imageFileName = image.filename
-    saveImagePath = os.path.join(outputPath, imageFileName)
+    saveImagePath = os.path.join(app.config["IMAGE_UPLOADS"], imageFileName)
     image.save(saveImagePath)
     print("saveImagePath: ", saveImagePath)
     if imageFileName != "":
@@ -192,7 +191,7 @@ def image_detect3():
         detectedImage = utils.draw_bbox(original_image, pred_bbox)
         detectedImage = cv2.cvtColor(detectedImage, cv2.COLOR_BGR2RGB)
         detectedImageFileName = imageFileName.split('.')[0] + '_detected' + '.' + imageFileName.split('.')[1]
-        detectedImagePath = os.path.join(outputPath, detectedImageFileName)
+        detectedImagePath = os.path.join(app.config["IMAGE_UPLOADS"], detectedImageFileName)
         print("detectedImagePath: ", detectedImagePath)
         cv2.imwrite(detectedImagePath, detectedImage)
         
@@ -218,7 +217,7 @@ def image_detect4():
     print("image_detect4 received request")
     image = request.files["images"]
     imageFileName = image.filename
-    saveImagePath = os.path.join(outputPath, imageFileName)
+    saveImagePath = os.path.join(app.config["IMAGE_UPLOADS"], imageFileName)
     image.save(saveImagePath)
     print("saveImagePath: ", saveImagePath)
     if imageFileName != "":
@@ -249,7 +248,7 @@ def image_detect4():
         detectedImage = utils.draw_bbox(original_image, pred_bbox)
         detectedImage = cv2.cvtColor(detectedImage, cv2.COLOR_BGR2RGB)
         detectedImageFileName = imageFileName.split('.')[0] + '_detected' + '.' + imageFileName.split('.')[1]
-        detectedImagePath = os.path.join(outputPath, detectedImageFileName)
+        detectedImagePath = os.path.join(app.config["IMAGE_UPLOADS"], detectedImageFileName)
         print("detectedImagePath: ", detectedImagePath)
         cv2.imwrite(detectedImagePath, detectedImage)
         
@@ -266,13 +265,102 @@ def image_detect4():
         return jsonify({"response": "FileNotFoundError"}), 400
 
 
-@objdetect.route('/video_detect', methods=['POST'])
-def video_detect():
+@objdetect.route('/video_upload', methods=['POST'])
+def video_upload():
+    video = request.files["video"]
+    videoFileName = video.filename
+    if videoFileName != "":
+        saveVideoPath = os.path.join(app.config["VIDEO_UPLOADS"], videoFileName)
+        video.save(saveVideoPath)
+        print("saveVideoPath: ", saveVideoPath)
+        return jsonify({"response": "file uploaded successfully"}), 200
+    else:
+        return jsonify({"response": "FileNotFoundError"}), 400
+
+def gen_video_stream(filepath, filename):
+    """Video streaming generator function."""
+    vid = cv2.VideoCapture(filepath)
+    lstVideoFileName = filename.split('.')
+    detectedVideoFileName = lstVideoFileName[0] + '_detected' + '.' + lstVideoFileName[1]
+    detectedVideoPath = os.path.join(app.config["VIDEO_UPLOADS"], detectedVideoFileName)
+
+    # by default VideoCapture returns float instead of int
+    width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = int(vid.get(cv2.CAP_PROP_FPS))
+    codec = cv2.VideoWriter_fourcc(*VIDEO_OUTPUT_FORMAT)
+    out = cv2.VideoWriter(detectedVideoPath, codec, fps, (width, height))
+
+    frame_id = 0
+    # Read until video is completed
+    while(vid.isOpened()):
+        # Capture frame-by-frame
+        return_value, frame = vid.read()
+        if return_value:
+            # frame = cv2.resize(frame, (0,0), fx=0.5, fy=0.5) 
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # image = Image.fromarray(frame)
+        else:
+            if frame_id == vid.get(cv2.CAP_PROP_FRAME_COUNT):
+                print("Video processing complete")
+                break
+            raise ValueError("No image! Try with another video format")
+        
+        frame_size = frame.shape[:2]
+        image_data = cv2.resize(frame, (INPUT_IMAGE_SIZE, INPUT_IMAGE_SIZE))
+        image_data = image_data / 255.
+        image_data = image_data[np.newaxis, ...].astype(np.float32)
+        prev_time = time.time()
+
+        batch_data = tf.constant(image_data)
+        pred_bbox = infer(batch_data)
+        for key, value in pred_bbox.items():
+            boxes = value[:, :, 0:4]
+            pred_conf = value[:, :, 4:]
+
+        boxes, scores, classes, valid_detections = tf.image.combined_non_max_suppression(
+            boxes=tf.reshape(boxes, (tf.shape(boxes)[0], -1, 1, 4)),
+            scores=tf.reshape(
+                pred_conf, (tf.shape(pred_conf)[0], -1, tf.shape(pred_conf)[-1])),
+            max_output_size_per_class=50,
+            max_total_size=50,
+            iou_threshold=IOU,
+            score_threshold=SCORE
+        )
+        pred_bbox = [boxes.numpy(), scores.numpy(), classes.numpy(), valid_detections.numpy()]
+        detectedImage = utils.draw_bbox(frame, pred_bbox)
+        curr_time = time.time()
+        exec_time = curr_time - prev_time
+        # result = np.asarray(detectedImage)
+        info = "time: %.2f ms" %(1000*exec_time)
+        print(info)
+
+        result = cv2.cvtColor(detectedImage, cv2.COLOR_RGB2BGR)
+        out.write(result)
+        frame_id += 1
+
+        r, frame = cv2.imencode('.jpg', result)
+        yield(b'--frame\r\n' b'Content-Type: image/jpg\r\n\r\n' + frame.tobytes() + b'\r\n\r\n')
+
+@objdetect.route('/video_detect/<filename>', methods=['GET'])
+def video_detect(filename):
+    print("video_detect filename: ", filename)
+    try:
+      filepath = os.path.join(app.config["VIDEO_UPLOADS"], filename)
+      if os.path.isfile(filepath):
+        return Response(gen_video_stream(filepath, filename), mimetype='multipart/x-mixed-replace; boundary=frame')
+      else:
+        return jsonify({"response": "FileNotFoundError"}), 400
+    except Exception as e:
+        print("video_detect error: ", e)
+
+@objdetect.route('/video_detect2', methods=['POST'])
+def video_detect2():
     video = request.files["video"]
     videoFileName = video.filename
     if videoFileName != "":
         lstVideoFileName = videoFileName.split('.')
-        saveVideoPath = os.path.join(outputPath, videoFileName)
+        saveVideoPath = os.path.join(app.config["VIDEO_UPLOADS"], videoFileName)
         detectedVideoPath = lstVideoFileName[0] + '_detected' + '.' + lstVideoFileName[1]
         video.save(saveVideoPath)
         print("saveVideoPath: ", saveVideoPath)
