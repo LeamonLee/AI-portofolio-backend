@@ -2,6 +2,7 @@ from flask import request, Blueprint, jsonify, Response, send_file
 from API import app, logger
 import io, time
 import os, traceback, base64
+from core.config import cfg
 
 # =============================
 import tensorflow as tf
@@ -35,9 +36,11 @@ def error_400(error):
     response = dict(message="400 Error, {0}".format(error), detail=traceback.format_exc())
     return jsonify(response), 400
 
+dctModel = {
 
-weightsPath = os.path.join(app.root_path, "checkpoints\yolov4-custom-lpr-416")
-print("weightsPath: ", weightsPath)
+}
+
+
 INPUT_IMAGE_SIZE = 416
 IOU = 0.45
 SCORE = 0.25
@@ -49,12 +52,17 @@ VIDEO_OUTPUT_FORMAT = 'MP4V'
 # session = InteractiveSession(config=config)
 # STRIDES, ANCHORS, NUM_CLASS, XYSCALE = utils.load_config(FLAGS)
 
-saved_model_loaded = tf.saved_model.load(weightsPath, tags=[tag_constants.SERVING])
-infer = saved_model_loaded.signatures['serving_default']
+dctInfer = {}
+
+for k,v in cfg.YOLO.MYCLASSES.items(): 
+  weightsPath = os.path.join(app.root_path, v["modelPath"])
+  print("weightsPath: ", weightsPath) 
+  saved_model_loaded = tf.saved_model.load(weightsPath, tags=[tag_constants.SERVING])
+  dctInfer[k] = saved_model_loaded.signatures['serving_default']
 
 # API that returns JSON with classes found in images
 @objdetect.route('/image_detect', methods=['POST'])
-def image_detect():
+def image_detect1():
     image = request.files["images"]
     imageFileName = image.filename
     saveImagePath = os.path.join(app.config["IMAGE_UPLOADS"], imageFileName)
@@ -68,7 +76,7 @@ def image_detect():
         image_data = image_data / 255.
         image_data = image_data[np.newaxis, ...].astype(np.float32)
         batch_data = tf.constant(image_data)
-        pred_bbox = infer(batch_data)
+        pred_bbox = dctInfer(batch_data)
 
         for key, value in pred_bbox.items():
             boxes = value[:, :, 0:4]
@@ -121,7 +129,7 @@ def image_detect2():
         image_data = image_data / 255.
         image_data = image_data[np.newaxis, ...].astype(np.float32)
         batch_data = tf.constant(image_data)
-        pred_bbox = infer(batch_data)
+        pred_bbox = dctInfer(batch_data)
 
         for key, value in pred_bbox.items():
             boxes = value[:, :, 0:4]
@@ -171,7 +179,7 @@ def image_detect3():
         image_data = image_data / 255.
         image_data = image_data[np.newaxis, ...].astype(np.float32)
         batch_data = tf.constant(image_data)
-        pred_bbox = infer(batch_data)
+        pred_bbox = dctInfer(batch_data)
 
         for key, value in pred_bbox.items():
             boxes = value[:, :, 0:4]
@@ -212,9 +220,12 @@ def image_detect3():
 
 
 # API that returns JSON with classes found in images
-@objdetect.route('/image_detect4', methods=['POST'])
-def image_detect4():
-    print("image_detect4 received request")
+@objdetect.route('/image_detect/<classesName>', methods=['POST'])
+def image_detect(classesName):
+
+    if classesName not in dctInfer.keys():
+      return jsonify({"response": "classesName is not allowed"}), 400
+
     image = request.files["images"]
     imageFileName = image.filename
     saveImagePath = os.path.join(app.config["IMAGE_UPLOADS"], imageFileName)
@@ -228,7 +239,7 @@ def image_detect4():
         image_data = image_data / 255.
         image_data = image_data[np.newaxis, ...].astype(np.float32)
         batch_data = tf.constant(image_data)
-        pred_bbox = infer(batch_data)
+        pred_bbox = dctInfer[classesName](batch_data)
 
         for key, value in pred_bbox.items():
             boxes = value[:, :, 0:4]
@@ -245,7 +256,7 @@ def image_detect4():
         )
 
         pred_bbox = [boxes.numpy(), scores.numpy(), classes.numpy(), valid_detections.numpy()]
-        detectedImage = utils.draw_bbox(original_image, pred_bbox)
+        detectedImage = utils.draw_bbox_by_classes(original_image, pred_bbox, classesName=classesName)
         detectedImage = cv2.cvtColor(detectedImage, cv2.COLOR_BGR2RGB)
         detectedImageFileName = imageFileName.split('.')[0] + '_detected' + '.' + imageFileName.split('.')[1]
         detectedImagePath = os.path.join(app.config["IMAGE_UPLOADS"], detectedImageFileName)
@@ -313,7 +324,7 @@ def gen_video_stream(filepath, filename):
         prev_time = time.time()
 
         batch_data = tf.constant(image_data)
-        pred_bbox = infer(batch_data)
+        pred_bbox = dctInfer(batch_data)
         for key, value in pred_bbox.items():
             boxes = value[:, :, 0:4]
             pred_conf = value[:, :, 4:]
@@ -342,9 +353,12 @@ def gen_video_stream(filepath, filename):
         r, frame = cv2.imencode('.jpg', result)
         yield(b'--frame\r\n' b'Content-Type: image/jpg\r\n\r\n' + frame.tobytes() + b'\r\n\r\n')
 
-@objdetect.route('/video_detect/<filename>', methods=['GET'])
-def video_detect(filename):
-    print("video_detect filename: ", filename)
+@objdetect.route('/video_detect/<classesName>/<filename>', methods=['GET'])
+def video_detect(classesName, filename):
+    
+    if classesName not in dctInfer.keys():
+      return jsonify({"response": "classesName is not allowed"}), 400
+    
     try:
       filepath = os.path.join(app.config["VIDEO_UPLOADS"], filename)
       if os.path.isfile(filepath):
@@ -393,7 +407,7 @@ def video_detect2():
             prev_time = time.time()
 
             batch_data = tf.constant(image_data)
-            pred_bbox = infer(batch_data)
+            pred_bbox = dctInfer(batch_data)
             for key, value in pred_bbox.items():
                 boxes = value[:, :, 0:4]
                 pred_conf = value[:, :, 4:]
