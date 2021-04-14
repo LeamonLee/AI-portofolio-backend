@@ -50,14 +50,22 @@ def create_app(config_class=Config):
     app.config["IMAGE_UPLOADS"] = imageSavePath
     app.config["VIDEO_UPLOADS"] = videoSavePath
     app.config["ALLOWED_IMAGE_EXTENSIONS"] = ["JPEG", "JPG", "PNG"]
+    app.config.from_pyfile("objdetect.cfg")
+
+    print(app.config["INPUT_IMAGE_SIZE"])
+    print(app.config["IOU"])
+    print(app.config["SCORE"])
+    print(app.config["VIDEO_OUTPUT_FORMAT"])
 
     CORS(app, supports_credentials=True)
 
     from API.main.routes import main
-    from API.objectdetection.routes import objdetect
+    from API.objdetect_lpr.routes import objdetect_lpr
+    from API.objdetect_facemask.routes import objdetect_facemask
     from API.imageclassification.routes import classification
     app.register_blueprint(main)
-    app.register_blueprint(objdetect)
+    app.register_blueprint(objdetect_lpr)
+    app.register_blueprint(objdetect_facemask)
     app.register_blueprint(classification)
 
     return app

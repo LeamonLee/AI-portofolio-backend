@@ -13,3 +13,6 @@ dependencies:
     - absl-py
     - easydict
     - pillow
+    - flask
+    - flask-cors
+    - pytesseract
