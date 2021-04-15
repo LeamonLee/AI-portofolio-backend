@@ -1,0 +1,7 @@
+opencv-python
+easydict
+pillow
+flask
+flask-cors
+pytesseract
+gunicorn
