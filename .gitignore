@@ -1,3 +1,4 @@
 venv
 __pycache__
-tensorflow-yolov4-tflite
+tensorflow-yolov4-tflite/checkpoints
+tensorflow-yolov4-tflite/static
